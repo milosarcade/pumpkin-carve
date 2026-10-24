@@ -1,0 +1,1113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pumpkin Carve</title>
+<meta name="description" content="Carve pumpkins, design your own patterns and share them as level codes.">
+<style>
+  /* base rules the Claude artifact viewer normally supplies */
+  :root{color-scheme:light}
+  img{max-width:100%}
+  [hidden]:not([hidden=until-found i]){display:none!important}
+
+  :root {
+    --bg: #120a1c;
+    --panel: #1f1330;
+    --panel-2: #2b1b42;
+    --text: #f6e7d0;
+    --muted: #b8a3c9;
+    --orange: #ff8a1f;
+    --good: #7ddc6f;
+    --bad: #ff5a5a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: radial-gradient(ellipse at 50% 0%, #2a1840 0%, var(--bg) 65%) fixed, var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #app {
+    width: 100%;
+    max-width: 640px;
+    padding: 12px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .hud-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+  #levelName { font-weight: 700; font-size: 18px; }
+  #levelName small { color: var(--muted); font-weight: 500; margin-right: 6px; }
+  .acc { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .acc b { color: var(--text); font-size: 20px; }
+  .acc b.ok { color: var(--good); }
+  .timer {
+    position: relative;
+    height: 22px;
+    background: var(--panel);
+    border-radius: 11px;
+    overflow: hidden;
+  }
+  #timeFill {
+    position: absolute; inset: 0 auto 0 0;
+    width: 100%;
+    background: linear-gradient(90deg, #ff6a00, #ffb347);
+    transition: background .3s;
+  }
+  #timeFill.low { background: linear-gradient(90deg, #c4161c, var(--bad)); }
+  #timeText {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px #0008;
+  }
+  .stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+  }
+  canvas#game {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
+  }
+  #overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  #overlay.hidden { display: none; }
+  #overlay.bottom { align-items: flex-end; }
+  #overlay.bottom { padding-bottom: 4px; }
+  #overlay.bottom .card { padding: 12px 16px; max-width: 460px; }
+  #overlay.bottom .row { margin-top: 8px; }
+  .res-head { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  #overlay.bottom .card h2 { font-size: 22px; margin-bottom: 0; }
+  #overlay.bottom .msg { display: none; }
+  #overlay.bottom .card .big { font-size: 36px; margin: 2px 0 0; }
+  .card { animation: pop .25s ease-out; }
+  @keyframes pop { from { transform: translateY(8px); opacity: 0; } }
+  .card {
+    background: color-mix(in srgb, var(--panel) 92%, transparent);
+    border: 1px solid #ffffff1a;
+    border-radius: 16px;
+    padding: 22px 22px 18px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 60px #000a;
+    backdrop-filter: blur(4px);
+  }
+  .card h2 { margin: 0 0 8px; font-size: 26px; }
+  .card p { margin: 6px 0; color: var(--muted); line-height: 1.45; }
+  .card .big { font-size: 48px; font-weight: 800; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+  .card .big.ok { color: var(--good); }
+  .card .big.no { color: var(--bad); }
+  .stars { color: #ffd34d; font-size: 26px; letter-spacing: 4px; margin: 0 0 2px; }
+  .stars .off { opacity: .2; }
+  .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid #ffffff22;
+    border-radius: 10px;
+    padding: 9px 14px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #3a2758; }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { background: var(--orange); color: #2a1200; border-color: transparent; }
+  button.primary:hover { background: #ffa04a; }
+  .controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .tip { text-align: center; color: var(--muted); font-size: 13px; margin: 0; }
+  [hidden] { display: none !important; }
+  .card { max-height: 100%; overflow: auto; }
+  input {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid #ffffff2a;
+    border-radius: 8px;
+    padding: 7px 10px;
+    min-width: 0;
+  }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+  .editor { display: flex; flex-direction: column; gap: 10px; }
+  .ed-fields { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .ed-fields label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+  #edName { width: 12em; }
+  #edTime { width: 5em; }
+  .ed-status { text-align: center; margin: 0; font-size: 14px; min-height: 1.4em; }
+  .ed-status.err, .err { color: var(--bad); }
+  .code { width: 100%; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .lv-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; text-align: left; }
+  .lv { display: flex; align-items: center; gap: 6px; background: var(--panel-2); border-radius: 10px; padding: 6px 6px 6px 12px; }
+  .lv .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lv .nm small { color: var(--muted); margin-left: 6px; }
+  .lv button { padding: 6px 10px; font-size: 13px; }
+  .import { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .import input { flex: 1 1 10em; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hud-top">
+    <div id="levelName">Pumpkin Carve</div>
+    <div class="acc">Accuracy <b id="accText">0%</b> / 80%</div>
+  </div>
+  <div class="timer"><div id="timeFill"></div><div id="timeText">—</div></div>
+  <div class="stage">
+    <canvas id="game"></canvas>
+    <div id="overlay"></div>
+  </div>
+  <div class="controls" id="playControls">
+    <button id="undoBtn" disabled>↶ Undo</button>
+    <button id="clearBtn" disabled>Clear</button>
+    <button id="doneBtn" disabled>✔ Done</button>
+    <button id="muteBtn" title="Toggle sound">🔊</button>
+  </div>
+  <p class="tip" id="playTip">Trace the dashed line. Cover the whole outline and stay on it — carving off the line costs accuracy.</p>
+  <div id="editorPanel" class="editor" hidden>
+    <div class="ed-fields">
+      <label for="edName">Name <input id="edName" maxlength="24" autocomplete="off"></label>
+      <label for="edTime">Time (s) <input id="edTime" type="number" min="10" max="180" step="5"></label>
+    </div>
+    <p id="edStatus" class="ed-status"></p>
+    <div class="controls">
+      <button id="edUndo">↶ Undo point</button>
+      <button id="edClose">Close shape</button>
+      <button id="edDelShape">Delete last shape</button>
+      <button id="edClear">Clear all</button>
+    </div>
+    <div class="controls">
+      <button id="edExit">Menu</button>
+      <button id="edShare">Share code</button>
+      <button id="edSave">Save</button>
+      <button id="edTest" class="primary">▶ Test play</button>
+    </div>
+    <input id="edCode" class="code" readonly hidden aria-label="Level code">
+  </div>
+</div>
+
+<script>
+(() => {
+  const W = 600, H = 600;
+  const PUMP = { cx: 300, cy: 335, rx: 245, ry: 215 };
+  const TARGET_W = 10;  // band that must be carved
+  const TOL_W = 40;     // carving inside this band is not penalized
+  const BRUSH = 16;     // knife width
+  const PASS = 80;
+  const STEP = 2;       // sampling stride for scoring
+
+  function ellipsePts(cx, cy, rx, ry, n = 40) {
+    const p = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      p.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
+    }
+    return p;
+  }
+  function arcPts(cx, cy, r, a0, a1, n) {
+    const p = [];
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (a1 - a0) * (i / n);
+      p.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+    }
+    return p;
+  }
+
+  const LEVELS = [
+    {
+      name: 'Classic Jack', time: 45,
+      shapes: [
+        [[190, 265], [250, 265], [220, 205]],
+        [[350, 265], [410, 265], [380, 205]],
+        [[280, 325], [320, 325], [300, 290]],
+        [[165, 370], [225, 392], [255, 372], [300, 398], [345, 372], [375, 392], [435, 370],
+         [405, 440], [300, 468], [195, 440]],
+      ],
+    },
+    {
+      name: 'Toothy Grin', time: 40,
+      shapes: [
+        ellipsePts(215, 245, 40, 40),
+        ellipsePts(385, 245, 40, 40),
+        [[282, 322], [318, 322], [300, 292]],
+        [[150, 335], [195, 360], [195, 385], [225, 385], [225, 370], [280, 380], [280, 405],
+         [320, 405], [320, 380], [375, 370], [375, 385], [405, 385], [405, 360], [450, 335],
+         [420, 410], [375, 445], [375, 425], [345, 425], [345, 455], [300, 462], [255, 455],
+         [255, 425], [225, 425], [225, 445], [180, 410]],
+      ],
+    },
+    {
+      name: 'Black Cat', time: 35,
+      shapes: [
+        [[255, 190], [275, 225], [325, 225], [345, 190], [355, 245], [345, 280], [380, 330],
+         [395, 400], [385, 452], [445, 455], [458, 425], [472, 432], [462, 470], [300, 476],
+         [215, 470], [205, 400], [220, 330], [255, 280], [245, 245]],
+      ],
+    },
+    {
+      name: 'Night Bat', time: 30,
+      shapes: [
+        [[300, 272], [315, 250], [312, 280], [345, 272], [385, 248], [450, 243], [492, 280],
+         [452, 290], [425, 318], [395, 302], [365, 338], [338, 320], [300, 372], [262, 320],
+         [235, 338], [205, 302], [175, 318], [148, 290], [108, 280], [150, 243], [215, 248],
+         [255, 272], [288, 280], [285, 250]],
+        ellipsePts(420, 190, 28, 28, 32),
+      ],
+    },
+    {
+      name: 'Spooky Ghost', time: 30,
+      shapes: [
+        [...arcPts(300, 290, 90, Math.PI, Math.PI * 2, 24),
+         [390, 440], [360, 415], [330, 440], [300, 415], [270, 440], [240, 415], [210, 440]],
+        ellipsePts(265, 290, 16, 24, 28),
+        ellipsePts(335, 290, 16, 24, 28),
+        ellipsePts(300, 360, 20, 26, 28),
+      ],
+    },
+  ];
+
+  const $ = (s) => document.querySelector(s);
+  const canvas = $('#game');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  function mk() { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; }
+  const carveC = mk(), carveX = carveC.getContext('2d', { willReadFrequently: true });
+  const revealC = mk(), revealX = revealC.getContext('2d');
+  const glowC = mk(), glowX = glowC.getContext('2d');
+  const fleshC = mk(), fleshX = fleshC.getContext('2d');
+  const pumpC = mk();
+  drawPumpkinStatic(pumpC.getContext('2d'));
+
+  let levelIdx = 0, level = null;
+  let targetBits = null, tolBits = null, targetCount = 1;
+  let strokes = [], cur = null;
+  let state = 'title';          // title | countdown | play | result
+  let countEnd = 0, endAt = 0, timeLeft = 0;
+  let scoreDirty = false, lastScoreAt = 0;
+  let score = { acc: 0, coverage: 0, spill: 0 };
+  let revealed = false, timedOut = false, resultToken = 0;
+  let edit = null, hover = null;          // level editor draft
+  let customLevel = null, fromEditor = false;
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // ---------- drawing helpers ----------
+  function pumpkinPath(c) {
+    c.beginPath();
+    c.ellipse(PUMP.cx, PUMP.cy, PUMP.rx, PUMP.ry, 0, 0, Math.PI * 2);
+  }
+  function tracePath(c, shapes) {
+    c.beginPath();
+    for (const s of shapes) {
+      c.moveTo(s[0][0], s[0][1]);
+      for (let i = 1; i < s.length; i++) c.lineTo(s[i][0], s[i][1]);
+      c.closePath();
+    }
+  }
+
+  function drawPumpkinStatic(c) {
+    const { cx, cy, rx, ry } = PUMP;
+    // ground shadow
+    c.fillStyle = 'rgba(0,0,0,0.45)';
+    c.beginPath();
+    c.ellipse(cx, cy + ry - 8, rx * 0.85, 26, 0, 0, Math.PI * 2);
+    c.fill();
+    // body
+    const g = c.createRadialGradient(cx - 70, cy - 90, 20, cx, cy, rx * 1.05);
+    g.addColorStop(0, '#ffb655');
+    g.addColorStop(0.45, '#f57f17');
+    g.addColorStop(0.85, '#c0500a');
+    g.addColorStop(1, '#8a3305');
+    pumpkinPath(c);
+    c.fillStyle = g;
+    c.fill();
+    // ribs
+    c.save();
+    pumpkinPath(c);
+    c.clip();
+    c.strokeStyle = 'rgba(110,35,0,0.35)';
+    c.lineWidth = 7;
+    for (const f of [0.22, 0.5, 0.78]) {
+      c.beginPath();
+      c.ellipse(cx, cy, rx * f, ry * 1.02, 0, 0, Math.PI * 2);
+      c.stroke();
+    }
+    // highlight
+    const h = c.createRadialGradient(cx - 90, cy - 110, 5, cx - 90, cy - 110, 120);
+    h.addColorStop(0, 'rgba(255,240,200,0.35)');
+    h.addColorStop(1, 'rgba(255,240,200,0)');
+    c.fillStyle = h;
+    c.fillRect(0, 0, W, H);
+    c.restore();
+    // stem
+    c.beginPath();
+    c.moveTo(280, 132);
+    c.quadraticCurveTo(300, 140, 320, 132);
+    c.quadraticCurveTo(318, 105, 336, 80);
+    c.lineTo(322, 70);
+    c.quadraticCurveTo(298, 92, 286, 104);
+    c.closePath();
+    const sg = c.createLinearGradient(280, 70, 330, 130);
+    sg.addColorStop(0, '#7fa848');
+    sg.addColorStop(1, '#3e6420');
+    c.fillStyle = sg;
+    c.fill();
+    c.strokeStyle = '#2a4512';
+    c.lineWidth = 2;
+    c.stroke();
+  }
+
+  function drawHoles(t) {
+    const mask = revealed ? revealC : carveC;
+    // candle glow clipped to the carved mask
+    const flick = 1 + Math.sin(t / 90) * 0.04 + Math.sin(t / 37) * 0.03;
+    glowX.globalCompositeOperation = 'source-over';
+    glowX.clearRect(0, 0, W, H);
+    const g = glowX.createRadialGradient(300, 340, 10, 300, 340, 300 * flick);
+    g.addColorStop(0, '#fff6c8');
+    g.addColorStop(0.35, '#ffc144');
+    g.addColorStop(0.75, '#ff7b10');
+    g.addColorStop(1, '#a83800');
+    glowX.fillStyle = g;
+    glowX.fillRect(0, 0, W, H);
+    glowX.globalCompositeOperation = 'destination-in';
+    glowX.drawImage(mask, 0, 0);
+    glowX.globalCompositeOperation = 'source-over';
+    // pale flesh visible along the cut wall
+    fleshX.globalCompositeOperation = 'source-over';
+    fleshX.clearRect(0, 0, W, H);
+    fleshX.drawImage(mask, 0, 0);
+    fleshX.globalCompositeOperation = 'source-in';
+    fleshX.fillStyle = '#f2c27a';
+    fleshX.fillRect(0, 0, W, H);
+    fleshX.globalCompositeOperation = 'source-over';
+
+    ctx.drawImage(fleshC, -3, -3);
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,170,40,0.9)';
+    ctx.shadowBlur = revealed ? 30 : 16;
+    ctx.drawImage(glowC, 0, 0);
+    ctx.restore();
+  }
+
+  function drawGuide(t) {
+    ctx.save();
+    ctx.setLineDash([10, 8]);
+    ctx.lineDashOffset = -t / 60;
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(45,15,0,0.85)';
+    tracePath(ctx, level.shapes);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(pumpC, 0, 0);
+    if (state === 'edit') { drawEditor(t); return; }
+    if (!level) return;
+    if (state === 'result') {
+      // dim the pumpkin skin so the carving glows
+      ctx.save();
+      pumpkinPath(ctx);
+      ctx.fillStyle = 'rgba(15,0,25,0.35)';
+      ctx.fill();
+      ctx.restore();
+    }
+    drawHoles(t);
+    if (state === 'play' || state === 'countdown') drawGuide(t);
+    if (state === 'countdown') {
+      const n = Math.ceil((countEnd - performance.now()) / 1000);
+      ctx.save();
+      ctx.font = '800 120px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = 'rgba(20,5,30,0.8)';
+      ctx.fillStyle = '#fff3d6';
+      const label = n > 0 ? String(n) : 'Carve!';
+      if (n <= 0) ctx.font = '800 80px system-ui, sans-serif';
+      ctx.strokeText(label, 300, 330);
+      ctx.fillText(label, 300, 330);
+      ctx.restore();
+    }
+  }
+
+  // ---------- masks & scoring ----------
+  function bandBits(width) {
+    const c = mk(), x = c.getContext('2d', { willReadFrequently: true });
+    x.lineWidth = width;
+    x.lineJoin = 'round';
+    x.lineCap = 'round';
+    x.strokeStyle = '#fff';
+    tracePath(x, level.shapes);
+    x.stroke();
+    const d = x.getImageData(0, 0, W, H).data;
+    const bits = new Uint8Array((W / STEP) * (H / STEP));
+    let k = 0, count = 0;
+    for (let y = 0; y < H; y += STEP) {
+      for (let xx = 0; xx < W; xx += STEP, k++) {
+        if (d[(y * W + xx) * 4 + 3] > 127) { bits[k] = 1; count++; }
+      }
+    }
+    return [bits, count];
+  }
+
+  function computeScore() {
+    const d = carveX.getImageData(0, 0, W, H).data;
+    let k = 0, carved = 0, hit = 0, spill = 0;
+    for (let y = 0; y < H; y += STEP) {
+      for (let x = 0; x < W; x += STEP, k++) {
+        if (d[(y * W + x) * 4 + 3] > 127) {
+          carved++;
+          if (targetBits[k]) hit++;
+          if (!tolBits[k]) spill++;
+        }
+      }
+    }
+    const coverage = hit / targetCount;
+    const spillR = carved ? spill / carved : 0;
+    return { coverage, spill: spillR, acc: Math.round(coverage * (1 - spillR) * 100) };
+  }
+
+  // ---------- carving ----------
+  function carveSeg(a, b) {
+    carveX.save();
+    pumpkinPath(carveX);
+    carveX.clip();
+    carveX.lineCap = 'round';
+    carveX.lineJoin = 'round';
+    carveX.lineWidth = BRUSH;
+    carveX.strokeStyle = '#fff';
+    carveX.beginPath();
+    carveX.moveTo(a[0], a[1]);
+    carveX.lineTo(b[0], b[1]);
+    carveX.stroke();
+    carveX.restore();
+  }
+  function redrawCarve() {
+    carveX.clearRect(0, 0, W, H);
+    for (const s of strokes) {
+      for (let i = 0; i < s.length; i++) carveSeg(s[Math.max(0, i - 1)], s[i]);
+    }
+    scoreDirty = true;
+  }
+  function toCanvas(e) {
+    const r = canvas.getBoundingClientRect();
+    return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height];
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (state === 'edit') { editPointer(e); return; }
+    if (state !== 'play') return;
+    e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    const p = toCanvas(e);
+    cur = [p];
+    strokes.push(cur);
+    carveSeg(p, p);
+    scoreDirty = true;
+    sfx.scrape();
+    updateButtons();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (state === 'edit') { hover = toCanvas(e); return; }
+    if (!cur || state !== 'play') return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ev of (evs.length ? evs : [e])) {
+      const p = toCanvas(ev);
+      const last = cur[cur.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 1) continue;
+      carveSeg(last, p);
+      cur.push(p);
+    }
+    scoreDirty = true;
+    sfx.scrape();
+  });
+  const endStroke = () => { cur = null; };
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke);
+  canvas.addEventListener('pointerleave', () => { hover = null; });
+
+  // ---------- game flow ----------
+  function startLevel(i) { playLevel(LEVELS[i], i); }
+
+  // i is the built-in level index, or -1 for a custom level
+  function playLevel(lv, i) {
+    resultToken++;
+    setMode('play');
+    levelIdx = i;
+    level = lv;
+    [targetBits, targetCount] = bandBits(TARGET_W);
+    targetCount = Math.max(1, targetCount);
+    [tolBits] = bandBits(TOL_W);
+    strokes = [];
+    cur = null;
+    revealed = false;
+    timedOut = false;
+    carveX.clearRect(0, 0, W, H);
+    score = { acc: 0, coverage: 0, spill: 0 };
+    timeLeft = level.time;
+    $('#levelName').innerHTML = i >= 0
+      ? `<small>${i + 1}/${LEVELS.length}</small>${esc(level.name)}`
+      : `<small>Custom</small>${esc(level.name)}`;
+    hideOverlay();
+    state = 'countdown';
+    countEnd = performance.now() + 3000;
+    updateHud();
+    updateButtons();
+  }
+
+  function finish(byTimeout) {
+    if (state !== 'play') return;
+    state = 'result';
+    cur = null;
+    timedOut = byTimeout;
+    score = computeScore();
+    const pass = score.acc >= PASS;
+    if (pass) {
+      // pop out the carved pieces for the candle-lit reveal
+      revealX.clearRect(0, 0, W, H);
+      revealX.drawImage(carveC, 0, 0);
+      revealX.save();
+      pumpkinPath(revealX);
+      revealX.clip();
+      revealX.fillStyle = '#fff';
+      tracePath(revealX, level.shapes);
+      revealX.fill('evenodd');
+      revealX.restore();
+      revealed = true;
+      sfx.win();
+    } else {
+      sfx.lose();
+    }
+    updateHud();
+    updateButtons();
+    // let the carving glow for a moment before the score card appears
+    const token = ++resultToken;
+    setTimeout(() => { if (token === resultToken && state === 'result') showResult(pass); }, pass ? 1500 : 700);
+  }
+
+  function starsFor(acc) { return acc >= 95 ? 3 : acc >= 90 ? 2 : acc >= PASS ? 1 : 0; }
+
+  function showResult(pass) {
+    const last = levelIdx === LEVELS.length - 1;
+    const stars = starsFor(score.acc);
+    const starHtml = [0, 1, 2].map((i) => `<span class="${i < stars ? '' : 'off'}">★</span>`).join('');
+    let title, msg, buttons;
+    if (levelIdx < 0) {
+      title = pass ? '🎃 Carved!' : (timedOut ? '⏰ Time’s up!' : 'Not quite…');
+      msg = '';
+      buttons = (fromEditor
+        ? `<button data-act="editor">Back to editor</button>`
+        : `<button data-act="levels">My pumpkins</button>`)
+        + `<button class="primary" data-act="retry">${pass ? 'Play again' : 'Try again'}</button>`;
+    } else if (pass && last) {
+      title = '🏆 Master Carver!';
+      msg = 'You carved every pumpkin. The whole porch is glowing!';
+      buttons = `<button data-act="retry">Retry level</button><button class="primary" data-act="restart">Play again</button>`;
+    } else if (pass) {
+      title = '🎃 Carved!';
+      msg = 'Nice knife work — the candle shines right through.';
+      buttons = `<button data-act="retry">Retry</button><button class="primary" data-act="next">Next pumpkin →</button>`;
+    } else {
+      title = timedOut ? '⏰ Time’s up!' : 'Not quite…';
+      msg = `You need ${PASS}% to win. Trace the whole outline and keep the knife on the line.`;
+      buttons = `<button data-act="title">Menu</button><button class="primary" data-act="retry">Try again</button>`;
+    }
+    showOverlay(`
+      <div class="res-head">
+        <h2>${title}</h2>
+        <div class="big ${pass ? 'ok' : 'no'}">${score.acc}%</div>
+        <div class="stars">${starHtml}</div>
+      </div>
+      <p>Outline covered: <b>${Math.round(score.coverage * 100)}%</b> · Off the line: <b>${Math.round(score.spill * 100)}%</b>${pass ? ` · Time left: <b>${Math.ceil(timeLeft)}s</b>` : ''}</p>
+      <p class="msg">${msg}</p>
+      <div class="row">${buttons}</div>`, true);
+  }
+
+  function showTitle() {
+    resultToken++;
+    setMode('play');
+    state = 'title';
+    level = null;
+    $('#levelName').textContent = 'Pumpkin Carve';
+    timeLeft = 0;
+    updateHud();
+    updateButtons();
+    showOverlay(`
+      <h2>🎃 Pumpkin Carve</h2>
+      <p>Each pumpkin has a dashed outline. Trace it with your knife (drag with mouse or finger) before time runs out.</p>
+      <p>Score <b>${PASS}%</b> accuracy or better to win. Skipping parts of the outline or carving off the line lowers your score.</p>
+      <p>${LEVELS.length} pumpkins, each with less time than the last.</p>
+      <div class="row">
+        <button data-act="levels">My pumpkins</button>
+        <button data-act="editor">Level editor</button>
+        <button class="primary" data-act="start">Start carving</button>
+      </div>`);
+  }
+
+  const overlay = $('#overlay');
+  function showOverlay(html, bottom = false) {
+    overlay.classList.toggle('bottom', bottom);
+    overlay.innerHTML = `<div class="card">${html}</div>`;
+    overlay.classList.remove('hidden');
+  }
+  function hideOverlay() { overlay.classList.add('hidden'); }
+  overlay.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    const act = btn?.dataset.act;
+    if (!act) return;
+    sfx.unlock();
+    if (act === 'start' || act === 'restart') startLevel(0);
+    else if (act === 'retry') levelIdx < 0 ? playLevel(customLevel, -1) : startLevel(levelIdx);
+    else if (act === 'editor') openEditor(null, true);
+    else if (act === 'new') openEditor(null, false);
+    else if (act === 'levels') showLevels();
+    else if (act === 'playSaved' || act === 'editSaved') {
+      const lv = loadSaved().find((l) => l.id === btn.dataset.id);
+      if (!lv) return showLevels();
+      if (act === 'editSaved') return openEditor(lv);
+      customLevel = lv;
+      fromEditor = false;
+      playLevel(lv, -1);
+    } else if (act === 'delSaved') {
+      if (!btn.dataset.armed) { btn.dataset.armed = '1'; btn.textContent = 'Delete?'; return; }
+      storeSaved(loadSaved().filter((l) => l.id !== btn.dataset.id));
+      showLevels();
+    } else if (act === 'importPlay' || act === 'importEdit') {
+      const lv = decodeLevel($('#importCode').value);
+      if (!lv) { $('#importMsg').textContent = 'That isn’t a valid level code. Codes start with PC1.'; return; }
+      if (act === 'importEdit') return openEditor(lv);
+      customLevel = lv;
+      fromEditor = false;
+      playLevel(lv, -1);
+    }
+    else if (act === 'next') startLevel(levelIdx + 1);
+    else if (act === 'title') showTitle();
+  });
+
+  $('#undoBtn').addEventListener('click', () => {
+    if (state !== 'play' || !strokes.length) return;
+    strokes.pop();
+    redrawCarve();
+    updateButtons();
+  });
+  $('#clearBtn').addEventListener('click', () => {
+    if (state !== 'play') return;
+    strokes = [];
+    redrawCarve();
+    updateButtons();
+  });
+  $('#doneBtn').addEventListener('click', () => finish(false));
+  $('#muteBtn').addEventListener('click', () => {
+    sfx.muted = !sfx.muted;
+    $('#muteBtn').textContent = sfx.muted ? '🔇' : '🔊';
+  });
+
+  function updateButtons() {
+    const playing = state === 'play';
+    $('#undoBtn').disabled = !playing || !strokes.length;
+    $('#clearBtn').disabled = !playing || !strokes.length;
+    $('#doneBtn').disabled = !playing;
+  }
+
+  function updateHud() {
+    const acc = $('#accText');
+    acc.textContent = `${score.acc}%`;
+    acc.classList.toggle('ok', score.acc >= PASS);
+    const total = level ? level.time : 1;
+    const frac = level ? Math.max(0, timeLeft / total) : 0;
+    $('#timeFill').style.width = `${frac * 100}%`;
+    $('#timeFill').classList.toggle('low', !!level && timeLeft <= 10);
+    $('#timeText').textContent = level ? `${Math.ceil(timeLeft)}s` : '—';
+  }
+
+  // ---------- level editor ----------
+  const STORE_KEY = 'pumpkin-carve-levels';
+  const CLOSE_DIST = 14;
+
+  function clampTime(t) {
+    t = Math.round(Number(t));
+    return Number.isFinite(t) ? Math.min(180, Math.max(10, t)) : 30;
+  }
+  function validLevel(l) {
+    return !!l && typeof l.name === 'string' && Number.isFinite(l.time)
+      && Array.isArray(l.shapes) && l.shapes.length > 0
+      && l.shapes.every((sh) => Array.isArray(sh) && sh.length >= 3
+        && sh.every((p) => Array.isArray(p) && p.length === 2
+          && p.every((v) => Number.isFinite(v) && v >= 0 && v <= W)));
+  }
+  function loadSaved() {
+    try {
+      const a = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+      return Array.isArray(a) ? a.filter(validLevel) : [];
+    } catch { return []; }
+  }
+  function storeSaved(list) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); return true; } catch { return false; }
+  }
+  function encodeLevel(l) {
+    const json = JSON.stringify({ n: l.name, t: l.time, s: l.shapes.map((sh) => sh.map(([x, y]) => [Math.round(x), Math.round(y)])) });
+    let bin = '';
+    for (const b of new TextEncoder().encode(json)) bin += String.fromCharCode(b);
+    return 'PC1.' + btoa(bin);
+  }
+  function decodeLevel(code) {
+    try {
+      const c = String(code).trim();
+      if (!c.startsWith('PC1.')) return null;
+      const bytes = Uint8Array.from(atob(c.slice(4)), (ch) => ch.charCodeAt(0));
+      const o = JSON.parse(new TextDecoder().decode(bytes));
+      const l = { name: String(o.n || 'Shared pumpkin').slice(0, 24), time: clampTime(o.t), shapes: o.s };
+      return validLevel(l) ? l : null;
+    } catch { return null; }
+  }
+  function insidePumpkin([x, y]) {
+    const dx = (x - PUMP.cx) / PUMP.rx, dy = (y - PUMP.cy) / PUMP.ry;
+    return dx * dx + dy * dy <= 0.9;
+  }
+
+  function setMode(m) {
+    const editing = m === 'edit';
+    $('#editorPanel').hidden = !editing;
+    $('#playControls').hidden = editing;
+    $('#playTip').hidden = editing;
+    $('.acc').hidden = editing;
+    $('.timer').hidden = editing;
+  }
+
+  // src: a level to edit; with no src, resume the current draft (if resume) or start blank
+  function openEditor(src, resume = false) {
+    resultToken++;
+    if (src || !resume || !edit) {
+      edit = {
+        id: src?.id || null,
+        shapes: src ? src.shapes.map((sh) => sh.map((p) => [...p])) : [],
+        cur: [],
+      };
+      $('#edName').value = src?.name || 'My pumpkin';
+      $('#edTime').value = src?.time || 30;
+    }
+    state = 'edit';
+    level = null;
+    hover = null;
+    $('#edCode').hidden = true;
+    hideOverlay();
+    setMode('edit');
+    $('#levelName').textContent = 'Level editor';
+    updateEditor();
+  }
+
+  function updateEditor(msg, isErr = false) {
+    const n = edit.shapes.length, c = edit.cur.length;
+    let s = msg;
+    if (!s) {
+      if (c === 0) s = n
+        ? `${n} shape${n > 1 ? 's' : ''} ready. Click the pumpkin to start another, or test your level.`
+        : 'Click on the pumpkin to place points. Click the first point again to close the shape.';
+      else if (c < 3) s = `New shape: ${c} point${c > 1 ? 's' : ''}. A shape needs at least 3.`;
+      else s = `New shape: ${c} points. Click the first point or press Close shape to finish it.`;
+    }
+    const st = $('#edStatus');
+    st.textContent = s;
+    st.classList.toggle('err', isErr);
+    const ready = n > 0 || c >= 3;
+    $('#edUndo').disabled = !n && !c;
+    $('#edClose').disabled = c < 3;
+    $('#edDelShape').disabled = !n;
+    $('#edClear').disabled = !n && !c;
+    $('#edTest').disabled = !ready;
+    $('#edSave').disabled = !ready;
+    $('#edShare').disabled = !ready;
+  }
+
+  function closeShape() {
+    if (edit.cur.length < 3) return;
+    edit.shapes.push(edit.cur);
+    edit.cur = [];
+    sfx.tones([660, 880], 0.07, 'triangle');
+  }
+  // finish a valid in-progress shape, drop an incomplete one
+  function commitCur() {
+    if (edit.cur.length >= 3) closeShape();
+    else edit.cur = [];
+  }
+  function edLevel() {
+    return {
+      name: $('#edName').value.trim().slice(0, 24) || 'My pumpkin',
+      time: clampTime($('#edTime').value),
+      shapes: edit.shapes,
+    };
+  }
+
+  function editPointer(e) {
+    e.preventDefault();
+    const p = toCanvas(e);
+    hover = p;
+    const c = edit.cur;
+    if (c.length >= 3 && Math.hypot(p[0] - c[0][0], p[1] - c[0][1]) < CLOSE_DIST) {
+      closeShape();
+      return updateEditor();
+    }
+    if (!insidePumpkin(p)) return updateEditor('Keep points inside the pumpkin, away from the edge.', true);
+    const last = c[c.length - 1];
+    if (last && Math.hypot(p[0] - last[0], p[1] - last[1]) < 6) return;
+    c.push([Math.round(p[0]), Math.round(p[1])]);
+    sfx.scrape();
+    updateEditor();
+  }
+
+  function editUndo() {
+    if (edit.cur.length) edit.cur.pop();
+    else if (edit.shapes.length) edit.cur = edit.shapes.pop();  // reopen the last shape
+    updateEditor();
+  }
+
+  $('#edUndo').addEventListener('click', editUndo);
+  $('#edClose').addEventListener('click', () => { closeShape(); updateEditor(); });
+  $('#edDelShape').addEventListener('click', () => { edit.shapes.pop(); updateEditor(); });
+  $('#edClear').addEventListener('click', () => {
+    const btn = $('#edClear');
+    if (!btn.dataset.armed) {
+      btn.dataset.armed = '1';
+      btn.textContent = 'Clear everything?';
+      setTimeout(() => { delete btn.dataset.armed; btn.textContent = 'Clear all'; }, 2500);
+      return;
+    }
+    delete btn.dataset.armed;
+    btn.textContent = 'Clear all';
+    edit.shapes = [];
+    edit.cur = [];
+    updateEditor();
+  });
+  $('#edExit').addEventListener('click', () => { commitCur(); showTitle(); });
+  $('#edTest').addEventListener('click', () => {
+    sfx.unlock();
+    commitCur();
+    if (!edit.shapes.length) return updateEditor();
+    customLevel = edLevel();
+    fromEditor = true;
+    playLevel(customLevel, -1);
+  });
+  $('#edSave').addEventListener('click', () => {
+    commitCur();
+    if (!edit.shapes.length) return updateEditor();
+    const list = loadSaved();
+    const lv = { ...edLevel(), id: edit.id || Date.now().toString(36) };
+    edit.id = lv.id;
+    const i = list.findIndex((l) => l.id === lv.id);
+    if (i >= 0) list[i] = lv; else list.push(lv);
+    if (storeSaved(list)) updateEditor(`Saved “${lv.name}” in this browser. Find it under My pumpkins.`);
+    else updateEditor('This browser is blocking saving. Use Share code to keep your level instead.', true);
+  });
+  $('#edShare').addEventListener('click', () => {
+    commitCur();
+    if (!edit.shapes.length) return updateEditor();
+    const code = encodeLevel(edLevel());
+    const box = $('#edCode');
+    box.value = code;
+    box.hidden = false;
+    box.select();
+    const done = (ok) => updateEditor(ok
+      ? 'Level code copied. Others can paste it under My pumpkins to play it.'
+      : 'Copy the level code below. Others can paste it under My pumpkins to play it.');
+    try { navigator.clipboard.writeText(code).then(() => done(true), () => done(false)); } catch { done(false); }
+  });
+  window.addEventListener('keydown', (e) => {
+    if (state !== 'edit' || (e.target instanceof Element && e.target.closest('input'))) return;
+    if (e.key === 'Enter') { closeShape(); updateEditor(); }
+    else if (e.key === 'Backspace' || e.key === 'Delete' || ((e.metaKey || e.ctrlKey) && e.key === 'z')) {
+      e.preventDefault();
+      editUndo();
+    }
+  });
+
+  function drawEditor(t) {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // finished shapes: a soft band shows roughly what the player must carve
+    if (edit.shapes.length) {
+      ctx.strokeStyle = 'rgba(255,214,120,0.3)';
+      ctx.lineWidth = BRUSH;
+      tracePath(ctx, edit.shapes);
+      ctx.stroke();
+      ctx.setLineDash([10, 8]);
+      ctx.lineDashOffset = -t / 60;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(45,15,0,0.85)';
+      tracePath(ctx, edit.shapes);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    const c = edit.cur;
+    if (c.length) {
+      ctx.strokeStyle = '#2d0f00';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(c[0][0], c[0][1]);
+      for (const p of c.slice(1)) ctx.lineTo(p[0], p[1]);
+      if (hover) ctx.lineTo(hover[0], hover[1]);
+      ctx.stroke();
+      c.forEach((p, i) => {
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], i === 0 ? 7 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = i === 0 ? '#fff3d6' : '#2d0f00';
+        ctx.fill();
+      });
+      if (c.length >= 3 && hover && Math.hypot(hover[0] - c[0][0], hover[1] - c[0][1]) < CLOSE_DIST) {
+        ctx.beginPath();
+        ctx.arc(c[0][0], c[0][1], 13, 0, Math.PI * 2);
+        ctx.strokeStyle = '#7ddc6f';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+    }
+    if (hover) {
+      ctx.beginPath();
+      ctx.arc(hover[0], hover[1], 4, 0, Math.PI * 2);
+      ctx.fillStyle = insidePumpkin(hover) ? 'rgba(255,243,214,0.9)' : 'rgba(255,90,90,0.9)';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function showLevels() {
+    resultToken++;
+    setMode('play');
+    state = 'title';
+    level = null;
+    $('#levelName').textContent = 'My pumpkins';
+    const list = loadSaved();
+    const rows = list.length
+      ? list.map((l) => `
+        <div class="lv">
+          <span class="nm">${esc(l.name)}<small>${l.time}s · ${l.shapes.length} shape${l.shapes.length > 1 ? 's' : ''}</small></span>
+          <button data-act="playSaved" data-id="${esc(l.id)}">Play</button>
+          <button data-act="editSaved" data-id="${esc(l.id)}">Edit</button>
+          <button data-act="delSaved" data-id="${esc(l.id)}">Delete</button>
+        </div>`).join('')
+      : '<p>No saved pumpkins yet. Draw one in the level editor.</p>';
+    showOverlay(`
+      <h2>My pumpkins</h2>
+      <div class="lv-list">${rows}</div>
+      <p>Got a level code from a friend? Paste it here.</p>
+      <div class="import">
+        <input id="importCode" placeholder="PC1.…" autocomplete="off" aria-label="Level code">
+        <button data-act="importPlay">Play</button>
+        <button data-act="importEdit">Edit</button>
+      </div>
+      <p id="importMsg" class="err"></p>
+      <div class="row">
+        <button data-act="title">Back</button>
+        <button class="primary" data-act="new">New level</button>
+      </div>`);
+  }
+
+  // ---------- sound ----------
+  const sfx = {
+    muted: false, ac: null, noise: null, lastScrape: 0,
+    unlock() {
+      if (this.ac) return;
+      try {
+        this.ac = new (window.AudioContext || window.webkitAudioContext)();
+        const len = Math.floor(this.ac.sampleRate * 0.08);
+        this.noise = this.ac.createBuffer(1, len, this.ac.sampleRate);
+        const ch = this.noise.getChannelData(0);
+        for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+      } catch { this.ac = null; }
+    },
+    scrape() {
+      if (this.muted || !this.ac) return;
+      const now = this.ac.currentTime;
+      if (now - this.lastScrape < 0.06) return;
+      this.lastScrape = now;
+      const src = this.ac.createBufferSource();
+      src.buffer = this.noise;
+      const f = this.ac.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = 700 + Math.random() * 700;
+      f.Q.value = 2;
+      const g = this.ac.createGain();
+      g.gain.setValueAtTime(0.12, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      src.connect(f).connect(g).connect(this.ac.destination);
+      src.start(now);
+    },
+    tones(freqs, step, type) {
+      if (this.muted || !this.ac) return;
+      const t0 = this.ac.currentTime;
+      freqs.forEach((fr, i) => {
+        const o = this.ac.createOscillator();
+        const g = this.ac.createGain();
+        o.type = type;
+        o.frequency.value = fr;
+        const t = t0 + i * step;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.15, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + step * 1.8);
+        o.connect(g).connect(this.ac.destination);
+        o.start(t);
+        o.stop(t + step * 2);
+      });
+    },
+    win() { this.tones([523, 659, 784, 1047], 0.12, 'triangle'); },
+    lose() { this.tones([330, 262, 196], 0.18, 'sawtooth'); },
+  };
+  window.addEventListener('pointerdown', () => sfx.unlock(), { once: true });
+
+  // ---------- main loop ----------
+  function frame(t) {
+    const now = performance.now();
+    if (state === 'countdown' && now >= countEnd + 400) {
+      state = 'play';
+      endAt = now + level.time * 1000;
+      updateButtons();
+    }
+    if (state === 'play') {
+      timeLeft = Math.max(0, (endAt - now) / 1000);
+      if (scoreDirty && now - lastScoreAt > 250) {
+        score = computeScore();
+        scoreDirty = false;
+        lastScoreAt = now;
+      }
+      updateHud();
+      if (timeLeft <= 0) finish(true);
+    }
+    draw(t);
+    requestAnimationFrame(frame);
+  }
+
+  // test hook: lets automated checks trace the outline
+  window.__carve = { LEVELS, playLevel, openEditor, encodeLevel, decodeLevel, get edit() { return edit; }, get state() { return state; }, get score() { return score; }, finish, startLevel };
+
+  showTitle();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
